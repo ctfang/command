@@ -10,30 +10,35 @@ go get github.com/ctfang/command
 package main
 
 import (
-    "fmt"
-    "github.com/ctfang/command"
+	"fmt"
+	"github.com/ctfang/command"
 )
 
 func main() {
-    app := command.New()
-    // 设置命令
-    app.AddCommand(Demo{})
-    app.Run()
+	app := command.New()
+	app.AddCommand(Demo{})
+	app.Run()
 }
 
 // 定义一个测试命令
 type Demo struct {
 }
 
-func (d Demo) Configure() CommandConfig {
-    return CommandConfig{
-        Name:        "test",
-        Description: "测试命令",
-        Input:       InputConfig{},
-    }
+func (d Demo) Configure() command.CommandConfig {
+	return command.CommandConfig{
+		Name:        "test",
+		Description: "测试命令",
+		Input:       command.InputConfig{},
+	}
 }
 
-func (d Demo) Execute(input Input) {
-    fmt.Println("执行输出")
+func (d Demo) Execute(input command.Input) {
+	fmt.Println("执行输出")
 }
+~~~~
+
+运行
+~~~~
+go run main.go
+go run main.go test
 ~~~~
