@@ -10,12 +10,16 @@ type Console struct {
 	MapCommand map[string]MapCommand
 }
 
+// 创建一个命令应用
+func New() Console {
+	return Console{
+		MapCommand: map[string]MapCommand{},
+	}
+}
+
 type CommandInterface interface {
 	Configure() CommandConfig
 	Execute(input Input)
-}
-
-type Command struct {
 }
 
 type CommandConfig struct {
