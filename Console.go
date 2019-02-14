@@ -36,6 +36,7 @@ type MapCommand struct {
 	CommandConfig Configure
 }
 
+// 参数操作
 type Input struct {
 	// 是否有参数 【名称string】默认值bool
 	Has map[string]bool
@@ -47,9 +48,10 @@ type Input struct {
 	FilePath string
 }
 
+// 参数设置结构
 type Argument struct {
-	// 是否有参数 【名称string】默认值bool
-	Has map[string]bool
+	// 是否有参数 【名称string】
+	Has []string
 	// 必须输入参数 【命令位置】【赋值名称】默认值
 	Argument map[int]KeyValue
 	// 可选输入参数 【赋值名称（开头必须是-）】默认值
@@ -110,7 +112,7 @@ func (c *Console) Run() {
 
 // 参数解析
 func (i *Input) Parsed(Config Argument, args []string) {
-	for name, value := range Config.Has {
+	for _, name := range Config.Has {
 		for _, strArg := range args {
 			if name == strArg {
 				i.Has[name] = true
@@ -118,13 +120,13 @@ func (i *Input) Parsed(Config Argument, args []string) {
 		}
 		_, ok := i.Has[name]
 		if !ok {
-			i.Has[name] = value
+			i.Has[name] = false
 		}
 	}
 
 	lenArgument := len(args)
 	for mustInt, kv := range Config.Argument {
-		if lenArgument < mustInt {
+		if lenArgument <= mustInt {
 			// 不存在，报错,并且输出帮助命令
 			fmt.Println("必须输入参数:" + kv.Key)
 			os.Exit(1)

@@ -20,20 +20,26 @@ func main() {
 	app.Run()
 }
 
-// 定义一个测试命令
 type Demo struct {
+
 }
 
-func (d Demo) Configure() command.CommandConfig {
-	return command.CommandConfig{
-		Name:        "test",
-		Description: "测试命令",
-		Input:       command.InputConfig{},
+func (Demo) Configure() command.Configure {
+	return command.Configure{
+		Name:"test",
+		Description:"测试命令",
+		Input:command.Argument{
+			Argument: map[int]command.KeyValue{
+				0:{Key:"one"},// 参数在 0 位置获取
+			},
+			Has: []string{"one"},
+		},
 	}
 }
 
-func (d Demo) Execute(input command.Input) {
-	fmt.Println("执行输出")
+func (Demo) Execute(input command.Input) {
+	fmt.Println("必须输入的参数 one =",input.GetArgument("one"))
+	fmt.Println("是否有输入字符串 one ",input.GetHas("one"))
 }
 ~~~~
 
