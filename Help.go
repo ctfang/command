@@ -10,11 +10,11 @@ type Help struct {
 	console *Console
 }
 
-func (Help) Configure() CommandConfig {
-	return CommandConfig{
+func (Help) Configure() Configure {
+	return Configure{
 		Name:        "help",
 		Description: "帮助命令",
-		Input:       InputConfig{},
+		Input:       Argument{},
 	}
 }
 

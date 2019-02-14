@@ -18,22 +18,22 @@ func New() Console {
 }
 
 type CommandInterface interface {
-	Configure() CommandConfig
+	Configure() Configure
 	Execute(input Input)
 }
 
-type CommandConfig struct {
+type Configure struct {
 	//命令名称
 	Name string
 	// 说明
 	Description string
 	// 输入定义
-	Input InputConfig
+	Input Argument
 }
 
 type MapCommand struct {
 	Command       CommandInterface
-	CommandConfig CommandConfig
+	CommandConfig Configure
 }
 
 type Input struct {
@@ -47,7 +47,7 @@ type Input struct {
 	FilePath string
 }
 
-type InputConfig struct {
+type Argument struct {
 	// 是否有参数 【名称string】默认值bool
 	Has map[string]bool
 	// 必须输入参数 【命令位置】【赋值名称】默认值
@@ -64,7 +64,7 @@ type KeyValue struct {
 // 载入命令
 func (c *Console) AddCommand(Command CommandInterface) {
 	var SaveCom MapCommand
-	var CmdConfig CommandConfig
+	var CmdConfig Configure
 
 	CmdConfig = Command.Configure()
 	SaveCom.CommandConfig = CmdConfig
@@ -75,7 +75,7 @@ func (c *Console) AddCommand(Command CommandInterface) {
 // 载入命令
 func (c *Console) Run() {
 	defaultCmdName := "help"
-	_,ok := c.MapCommand[defaultCmdName]
+	_, ok := c.MapCommand[defaultCmdName]
 	if !ok {
 		// 注册帮助命令
 		c.AddCommand(Help{c})
@@ -99,17 +99,17 @@ func (c *Console) Run() {
 	// 执行到这里，必须有命令
 	MapCmd := c.MapCommand[cmdName]
 	input := Input{
-		Has: map[string]bool{},
+		Has:      map[string]bool{},
 		Argument: map[string]string{},
-		Option: map[string]string{},
-		FilePath:os.Args[0],
+		Option:   map[string]string{},
+		FilePath: os.Args[0],
 	}
 	input.Parsed(MapCmd.CommandConfig.Input, args)
 	MapCmd.Command.Execute(input)
 }
 
 // 参数解析
-func (i *Input) Parsed(Config InputConfig, args []string) {
+func (i *Input) Parsed(Config Argument, args []string) {
 	for name, value := range Config.Has {
 		for _, strArg := range args {
 			if name == strArg {
@@ -150,7 +150,7 @@ func (i *Input) Parsed(Config InputConfig, args []string) {
 			if strArgKy != "" {
 				_, ok := i.Option[strArgKy]
 				if ok {
-					i.Option[strArgKy] = strValue;
+					i.Option[strArgKy] = strValue
 				}
 			}
 		}
@@ -183,7 +183,6 @@ func (i *Input) GetOption(key string) string {
 	}
 	return value
 }
-
 
 func (i *Input) GetFilePath() string {
 	return i.FilePath
