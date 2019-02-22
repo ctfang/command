@@ -43,3 +43,30 @@ func (Help) EchoSpace(str string, mac int) {
 	strCon := strconv.Itoa(mac)
 	fmt.Printf("%-"+strCon+"s", str)
 }
+
+// 某个命令需要帮助时
+func (h Help) HelpExecute(con Configure) {
+	fmt.Println("Usage:")
+	fmt.Print("  ", con.Name)
+	for _, ArgParam := range con.Input.Argument {
+		fmt.Print(" <", ArgParam.Name, ">")
+	}
+	fmt.Println()
+	fmt.Println("Arguments:")
+	for _, ArgParam := range con.Input.Argument {
+		h.EchoSpace("  "+ArgParam.Name, 25)
+		fmt.Println(ArgParam.Description)
+	}
+	fmt.Println("Option:")
+	for _, ArgParam := range con.Input.Option {
+		h.EchoSpace("  -"+ArgParam.Name, 25)
+		fmt.Println(ArgParam.Description)
+	}
+	fmt.Println("Has:")
+	for _, ArgParam := range con.Input.Has {
+		h.EchoSpace("  "+ArgParam.Name, 25)
+		fmt.Println(ArgParam.Description)
+	}
+	fmt.Println("Description:")
+	fmt.Println("  ", con.Description)
+}

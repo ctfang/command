@@ -48,19 +48,19 @@ type Input struct {
 	FilePath string
 }
 
+type ArgParam struct {
+	Name        string // 名称
+	Description string // 说明
+}
+
 // 参数设置结构
 type Argument struct {
 	// 是否有参数 【名称string】
-	Has []string
+	Has []ArgParam
 	// 必须输入参数 【命令位置】【赋值名称】默认值
-	Argument map[int]KeyValue
+	Argument []ArgParam
 	// 可选输入参数 【赋值名称（开头必须是-）】默认值
-	Option map[string]string
-}
-
-type KeyValue struct {
-	Key   string
-	Value string
+	Option []ArgParam
 }
 
 // 载入命令
@@ -107,31 +107,46 @@ func (c *Console) Run() {
 		FilePath: os.Args[0],
 	}
 	input.Parsed(MapCmd.CommandConfig.Input, args)
+
+	if input.GetHas("-h") {
+		Help{c}.HelpExecute(MapCmd.CommandConfig)
+		os.Exit(0)
+	}
 	MapCmd.Command.Execute(input)
 }
 
 // 参数解析
 func (i *Input) Parsed(Config Argument, args []string) {
-	for _, name := range Config.Has {
+	for _, ArgParam := range Config.Has {
 		for _, strArg := range args {
-			if name == strArg {
-				i.Has[name] = true
+			if ArgParam.Name == strArg {
+				i.Has[ArgParam.Name] = true
 			}
 		}
-		_, ok := i.Has[name]
+		_, ok := i.Has[ArgParam.Name]
 		if !ok {
-			i.Has[name] = false
+			i.Has[ArgParam.Name] = false
+		}
+	}
+	// 帮助参数 -h 不需要配置
+	helpCmd := "-h"
+	i.Has[helpCmd] = false
+	for _, strArg := range args {
+		if helpCmd == strArg {
+			i.Has[helpCmd] = true
+			return
 		}
 	}
 
+	// 必须值
 	lenArgument := len(args)
 	for mustInt, kv := range Config.Argument {
 		if lenArgument <= mustInt {
 			// 不存在，报错,并且输出帮助命令
-			fmt.Println("必须输入参数:" + kv.Key)
+			fmt.Println("必须输入参数:" + kv.Name)
 			os.Exit(1)
 		} else {
-			i.Argument[kv.Key] = args[mustInt]
+			i.Argument[kv.Name] = args[mustInt]
 		}
 	}
 	var strArgKy, strValue string
@@ -150,10 +165,7 @@ func (i *Input) Parsed(Config Argument, args []string) {
 
 			}
 			if strArgKy != "" {
-				_, ok := i.Option[strArgKy]
-				if ok {
-					i.Option[strArgKy] = strValue
-				}
+				i.Option[strArgKy] = strValue
 			}
 		}
 	}
