@@ -48,9 +48,11 @@ type Input struct {
 	FilePath string
 }
 
+// 参数存储
 type ArgParam struct {
 	Name        string // 名称
 	Description string // 说明
+	Default     string // 默认值
 }
 
 // 参数设置结构
@@ -148,6 +150,10 @@ func (i *Input) Parsed(Config Argument, args []string) {
 		} else {
 			i.Argument[kv.Name] = args[mustInt]
 		}
+	}
+	// 选项值
+	for _, kv := range Config.Option {
+		i.Option[kv.Name] = kv.Default
 	}
 	var strArgKy, strValue string
 	for _, strArg := range args {
