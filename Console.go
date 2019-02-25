@@ -8,6 +8,8 @@ import (
 
 type Console struct {
 	MapCommand map[string]MapCommand
+	configPath string
+	config     ini
 }
 
 // 创建一个命令应用
@@ -65,15 +67,36 @@ type Argument struct {
 	Option []ArgParam
 }
 
+func (c *Console) IniConfig() {
+	path := c.getConfig()
+	c.config = ini{}
+	c.config.Load(path)
+}
+
 // 载入命令
 func (c *Console) AddCommand(Command CommandInterface) {
 	var SaveCom MapCommand
 	var CmdConfig Configure
 
 	CmdConfig = Command.Configure()
+
+	for key, ArgParam := range CmdConfig.Input.Option {
+		if c.config.Has(ArgParam.Name) {
+			CmdConfig.Input.Option[key].Default = c.config.GetString(ArgParam.Name,"")
+		}
+	}
+
 	SaveCom.CommandConfig = CmdConfig
 	SaveCom.Command = Command
 	c.MapCommand[CmdConfig.Name] = SaveCom
+}
+
+func (c *Console) getConfig() string {
+	return c.configPath
+}
+
+func (c *Console)SetConfig(path string)  {
+	c.configPath = path
 }
 
 // 载入命令

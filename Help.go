@@ -52,6 +52,12 @@ func (h Help) HelpExecute(con Configure) {
 		fmt.Print(" <", ArgParam.Name, ">")
 	}
 	fmt.Println()
+	for _, ArgParam := range con.Input.Option {
+		if len(ArgParam.Default)>=1 {
+			h.EchoSpace("    -"+ArgParam.Name,25)
+			fmt.Println("= "+ArgParam.Default)
+		}
+	}
 	fmt.Println("Arguments:")
 	for _, ArgParam := range con.Input.Argument {
 		h.EchoSpace("  "+ArgParam.Name, 25)
