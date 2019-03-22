@@ -19,6 +19,12 @@ func (Help) Configure() Configure {
 }
 
 func (h Help) Execute(input Input) {
+	fmt.Println("Usage:")
+	fmt.Println("  command [options] [arguments] [has]")
+	fmt.Println("Base Has Param:")
+	fmt.Println("  -d  守护进程启动")
+	fmt.Println("  -h  显示帮助信息参数")
+	fmt.Println("Available commands:")
 	// 命令排序
 	var keys []string
 	var macLen int
@@ -32,7 +38,7 @@ func (h Help) Execute(input Input) {
 	sort.Strings(keys)
 	macLen += 4
 	for _, cmdName := range keys {
-		h.EchoSpace(cmdName, macLen)
+		h.EchoSpace("  "+cmdName, macLen)
 		kv := h.console.MapCommand[cmdName]
 		fmt.Println(kv.CommandConfig.Description)
 	}
@@ -53,9 +59,9 @@ func (h Help) HelpExecute(con Configure) {
 	}
 	fmt.Println()
 	for _, ArgParam := range con.Input.Option {
-		if len(ArgParam.Default)>=1 {
-			h.EchoSpace("    -"+ArgParam.Name,25)
-			fmt.Println("= "+ArgParam.Default)
+		if len(ArgParam.Default) >= 1 {
+			h.EchoSpace("    -"+ArgParam.Name, 25)
+			fmt.Println("= " + ArgParam.Default)
 		}
 	}
 	fmt.Println("Arguments:")

@@ -2,7 +2,10 @@ package command
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -25,7 +28,7 @@ type CommandInterface interface {
 }
 
 type Configure struct {
-	//命令名称
+	// 命令名称
 	Name string
 	// 说明
 	Description string
@@ -73,16 +76,21 @@ func (c *Console) IniConfig() {
 	c.config.Load(path)
 }
 
+var BaseInputHas = []ArgParam{
+	ArgParam{Name: "-d", Description: "守护进程启动"},
+	ArgParam{Name: "-h", Description: "显示帮助信息"},
+}
+
 // 载入命令
 func (c *Console) AddCommand(Command CommandInterface) {
 	var SaveCom MapCommand
 	var CmdConfig Configure
 
 	CmdConfig = Command.Configure()
-
+	CmdConfig.Input.Has = append(CmdConfig.Input.Has, BaseInputHas...)
 	for key, ArgParam := range CmdConfig.Input.Option {
 		if c.config.Has(ArgParam.Name) {
-			CmdConfig.Input.Option[key].Default = c.config.GetString(ArgParam.Name,"")
+			CmdConfig.Input.Option[key].Default = c.config.GetString(ArgParam.Name, "")
 		}
 	}
 
@@ -95,7 +103,7 @@ func (c *Console) getConfig() string {
 	return c.configPath
 }
 
-func (c *Console)SetConfig(path string)  {
+func (c *Console) SetConfig(path string) {
 	c.configPath = path
 }
 
@@ -133,10 +141,24 @@ func (c *Console) Run() {
 	}
 	input.Parsed(MapCmd.CommandConfig.Input, args)
 
+	// 如果有帮助参数，只显示帮助信息
 	if input.GetHas("-h") {
 		Help{c}.HelpExecute(MapCmd.CommandConfig)
 		os.Exit(0)
 	}
+	// 如果有守护进程方式启动参数，拦截，并且转换后台启动
+	if input.GetHas("-d") {
+		if runtime.GOOS == "windows" {
+			log.Println("windows 不支持 -d 参数")
+		} else if input.GetOption("-d") != "true" {
+			os.Args = append(os.Args, "-d=true")
+			command := exec.Command(os.Args[0], os.Args[1:]...)
+			_ = command.Start()
+			os.Exit(0)
+			return
+		}
+	}
+
 	MapCmd.Command.Execute(input)
 }
 
