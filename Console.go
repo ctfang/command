@@ -2,10 +2,8 @@ package command
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 )
 
@@ -148,15 +146,19 @@ func (c *Console) Run() {
 	}
 	// 如果有守护进程方式启动参数，拦截，并且转换后台启动
 	if input.GetHas("-d") {
-		if runtime.GOOS == "windows" {
-			log.Println("windows 不支持 -d 参数")
-		} else if input.GetOption("-d") != "true" {
-			os.Args = append(os.Args, "-d=true")
-			command := exec.Command(os.Args[0], os.Args[1:]...)
-			_ = command.Start()
-			os.Exit(0)
-			return
+		for key, str := range os.Args {
+			if str == "-d" {
+				os.Args[key] = "-d=true"
+				break
+			}
 		}
+		command := exec.Command(os.Args[0], os.Args[1:]...)
+		command.Stdout = os.Stdout
+		_ = command.Start()
+		return
+	} else if input.GetOption("d") == "true" {
+		// 命令转换为后台的传入
+		input.Has["-d"] = true
 	}
 
 	MapCmd.Command.Execute(input)
@@ -245,6 +247,15 @@ func (i *Input) GetOption(key string) string {
 	value, ok := i.Option[key]
 	if !ok {
 		return ""
+	}
+	return value
+}
+
+// 是否后台启动
+func (i *Input) IsDaemon() bool {
+	value, ok := i.Has["-d"]
+	if !ok {
+		return false
 	}
 	return value
 }
