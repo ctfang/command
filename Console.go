@@ -75,10 +75,13 @@ func (c *Console) IniConfig() {
 	c.config.Load(path)
 }
 
-var BaseInputHas = []ArgParam{
-	ArgParam{Name: "-d", Description: "守护进程启动"},
-	ArgParam{Name: "-h", Description: "显示帮助信息"},
+var BaseInputHas = map[string]ArgParam{
+	"-d": ArgParam{Name: "-d", Description: "守护进程启动"},
+	"-h": ArgParam{Name: "-h", Description: "显示帮助信息"},
 }
+
+// 记录 BaseInputHas 是否被覆盖，如果覆盖，就不执行默认流程
+var cacheInput = make(map[string]map[string]bool)
 
 // 载入命令
 func (c *Console) AddCommand(Command CommandInterface) {
@@ -86,7 +89,21 @@ func (c *Console) AddCommand(Command CommandInterface) {
 	var CmdConfig Configure
 
 	CmdConfig = Command.Configure()
-	CmdConfig.Input.Has = append(CmdConfig.Input.Has, BaseInputHas...)
+	for _, ArgParam := range CmdConfig.Input.Has {
+		switch ArgParam.Name {
+		case "-d":
+			cacheInput[CmdConfig.Name]["-d"] = true
+		case "-h":
+			cacheInput[CmdConfig.Name]["-h"] = true
+		}
+	}
+	if _, ok := cacheInput[CmdConfig.Name]["-d"]; ok == false {
+		CmdConfig.Input.Has = append(CmdConfig.Input.Has, BaseInputHas["-d"])
+	}
+	if _, ok := cacheInput[CmdConfig.Name]["-d"]; ok == false {
+		CmdConfig.Input.Has = append(CmdConfig.Input.Has, BaseInputHas["-h"])
+	}
+
 	for key, ArgParam := range CmdConfig.Input.Option {
 		if c.config.Has(ArgParam.Name) {
 			CmdConfig.Input.Option[key].Default = c.config.GetString(ArgParam.Name, "")
@@ -142,27 +159,29 @@ func (c *Console) Run() {
 	if err != nil {
 		return
 	}
-
-	// 如果有帮助参数，只显示帮助信息
-	if input.GetHas("-h") {
-		Help{c}.HelpExecute(MapCmd.CommandConfig)
-		return
-	}
-	// 如果有守护进程方式启动参数，拦截，并且转换后台启动
-	if input.GetHas("-d") {
-		for key, str := range os.Args {
-			if str == "-d" {
-				os.Args[key] = "-d=true"
-				break
-			}
+	if _, ok := cacheInput[cmdName]["-h"]; ok == false {
+		// -h没有被覆盖时候,如果有帮助参数，只显示帮助信息
+		if input.GetHas("-h") {
+			Help{c}.HelpExecute(MapCmd.CommandConfig)
+			return
 		}
-		command := exec.Command(os.Args[0], os.Args[1:]...)
-		command.Stdout = os.Stdout
-		_ = command.Start()
-		return
-	} else if input.GetOption("d") == "true" {
-		// 命令转换为后台的传入
-		input.Has["-d"] = true
+	}
+	if _, ok := cacheInput[cmdName]["-d"]; ok == false {
+		// 如果有守护进程方式启动参数，拦截，并且转换后台启动
+		if input.GetHas("-d") {
+			for key, str := range os.Args {
+				if str == "-d" {
+					os.Args[key] = "-d=true"
+					break
+				}
+			}
+			command := exec.Command(os.Args[0], os.Args[1:]...)
+			_ = command.Start()
+			return
+		} else if input.GetOption("d") == "true" {
+			// 命令转换为后台的传入
+			input.Has["-d"] = true
+		}
 	}
 
 	MapCmd.Command.Execute(input)
