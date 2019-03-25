@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -137,12 +138,15 @@ func (c *Console) Run() {
 		Option:   map[string]string{},
 		FilePath: os.Args[0],
 	}
-	input.Parsed(MapCmd.CommandConfig.Input, args)
+	err := input.Parsed(MapCmd.CommandConfig.Input, args)
+	if err != nil {
+		return
+	}
 
 	// 如果有帮助参数，只显示帮助信息
 	if input.GetHas("-h") {
 		Help{c}.HelpExecute(MapCmd.CommandConfig)
-		os.Exit(0)
+		return
 	}
 	// 如果有守护进程方式启动参数，拦截，并且转换后台启动
 	if input.GetHas("-d") {
@@ -165,7 +169,7 @@ func (c *Console) Run() {
 }
 
 // 参数解析
-func (i *Input) Parsed(Config Argument, args []string) {
+func (i *Input) Parsed(Config Argument, args []string) error {
 	for _, ArgParam := range Config.Has {
 		for _, strArg := range args {
 			if ArgParam.Name == strArg {
@@ -183,7 +187,7 @@ func (i *Input) Parsed(Config Argument, args []string) {
 	for _, strArg := range args {
 		if helpCmd == strArg {
 			i.Has[helpCmd] = true
-			return
+			return nil
 		}
 	}
 
@@ -193,7 +197,7 @@ func (i *Input) Parsed(Config Argument, args []string) {
 		if lenArgument <= mustInt {
 			// 不存在，报错,并且输出帮助命令
 			fmt.Println("必须输入参数:" + kv.Name)
-			os.Exit(1)
+			return errors.New("必须输入参数:" + kv.Name)
 		} else {
 			i.Argument[kv.Name] = args[mustInt]
 		}
@@ -222,6 +226,7 @@ func (i *Input) Parsed(Config Argument, args []string) {
 			}
 		}
 	}
+	return nil
 }
 
 // 参数
