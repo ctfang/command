@@ -30,13 +30,13 @@ type Echo struct {
 
 func (Echo) Configure() command.Configure {
 	return command.Configure{
-		Name:"hello",
-		Description:"示例命令 hello",
+		Name:"echo",
+		Description:"示例命令 echo",
 	}
 }
 
 func (Echo) Execute(input command.Input) {
-	log.Println("hello command")
+	log.Println("echo command")
 }
 ~~~~
 
@@ -50,7 +50,7 @@ Base Has Param:
   -d  守护进程启动
   -h  显示帮助信息参数
 Available commands:
-  hello  示例命令 hello
+  echo  示例命令 echo
   help   帮助命令
   
 go run main.go echo
