@@ -24,7 +24,7 @@ func main() {
 	app.AddCommand(Hello{})
 	app.Run()
 }
-// Hello 需要实现接口 CommandInterface
+// Echo 需要实现接口 CommandInterface
 type Echo struct {
 }
 
@@ -127,3 +127,47 @@ hello
 是否输入了 -t ： true
 
 ~~~~
+#### 自定义
+
+* 自带了help命令，可以友好输出帮助列表
+* 为每个命令都加上了 -d，可以转化为守护进程执行
+* 为每个命令都加上了 -h，和显示帮助详情
+* 以上都支持覆盖，只要在需要覆盖的命令，重复定义即可
+
+##### 默认值
+
+虽然可以在执行命令时候，赋值默认值，例如：
+~~~~
+name := input.GetOption("name")
+if name == "" {
+    name = "李四"
+}
+~~~~
+但是，对于多环境运行，总归是不方便；特别是在一些命令需要非常多的参数时，总不能修改代码在运行。
+
+为了应付这种问题，command，允许 添加一个 config.ini 配置文件，设置默认值
+~~~~
+app := command.New()
+
+app.SetConfig("config.ini")
+app.IniConfig()
+
+app.Run()
+~~~~
+config.ini 文件内容
+~~~~
+; 这个是注释
+url="127.0.0.1:8080"
+; 名称默认值
+name="张三"
+~~~~
+将会输出 [张三]
+~~~~
+name := input.GetOption("name")
+if name == "" {
+    name = "李四"
+}
+fmt.Println(name)
+~~~~
+
+
