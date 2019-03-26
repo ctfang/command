@@ -176,6 +176,10 @@ func (c *Console) Run() {
 				}
 			}
 			command := exec.Command(os.Args[0], os.Args[1:]...)
+			out, err := os.OpenFile("/dev/null", os.O_RDWR, 0)
+			if err == nil {
+				command.Stdout = out
+			}
 			_ = command.Start()
 			return
 		} else if input.GetOption("d") == "true" {
