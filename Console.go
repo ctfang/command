@@ -30,13 +30,13 @@ func New() Console {
 	}
 }
 
-func helpHandle(val string, c *Console) bool {
+func helpHandle(val string, c *Console) (string, bool) {
 	if val != "false" {
 		help := Help{c}
 		help.HelpExecute(c.run.CommandConfig)
-		return false
+		return val, false
 	}
-	return true
+	return val, true
 }
 
 func helpDaemon(val string, c *Console) bool {
@@ -82,10 +82,10 @@ type Input struct {
 
 // 参数存储
 type ArgParam struct {
-	Name        string                            // 名称
-	Description string                            // 说明
-	Default     string                            // 默认值
-	Call        func(val string, c *Console) bool // 获取值的时候执行, return false中断
+	Name        string                                      // 名称
+	Description string                                      // 说明
+	Default     string                                      // 默认值
+	Call        func(val string, c *Console) (string, bool) // 获取值的时候执行, return false中断
 }
 
 // 参数设置结构
@@ -236,7 +236,8 @@ func (i *Input) ParsedOptions(Config Argument, args []string) {
 			i.Option[kv.Name] = append(i.Option[kv.Name], kv.Default)
 		}
 		if kv.Call != nil {
-			stop := kv.Call(i.Option[kv.Name][0], i.console)
+			var stop bool
+			i.Option[kv.Name][0], stop = kv.Call(i.Option[kv.Name][0], i.console)
 			if stop == false {
 				os.Exit(0)
 			}
