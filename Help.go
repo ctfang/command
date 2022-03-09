@@ -23,7 +23,7 @@ func (h Help) Execute(input Input) {
 	fmt.Println("  command [options] [arguments] [has]")
 	fmt.Println("Base Options:")
 	for _, param := range h.console.baseOption {
-		fmt.Printf("  %v  %v\n", param.Name, param.Description)
+		fmt.Printf("  -%v  %v\n", param.Name, param.Description)
 	}
 	fmt.Println("Available commands:")
 	// 命令排序
