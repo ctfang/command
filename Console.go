@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -12,16 +11,44 @@ type Console struct {
 	MapCommand map[string]MapCommand
 	configPath string
 	config     ini
+	baseOption []ArgParam
+	run        MapCommand
 }
 
 // 创建一个命令应用
 func New() Console {
 	return Console{
 		MapCommand: map[string]MapCommand{},
+		baseOption: []ArgParam{
+			{
+				Name:        "h",
+				Description: "显示帮助信息",
+				Default:     "false",
+				Call:        helpHandle,
+			},
+		},
 	}
 }
 
-type CommandInterface interface {
+func helpHandle(val string, c *Console) bool {
+	if val != "false" {
+		help := Help{c}
+		help.HelpExecute(c.run.CommandConfig)
+		return false
+	}
+	return true
+}
+
+func helpDaemon(val string, c *Console) bool {
+	return false
+}
+
+// 添加通用参数
+func (c *Console) AddBaseOption(param ArgParam) {
+	c.baseOption = append(c.baseOption, param)
+}
+
+type Command interface {
 	Configure() Configure
 	Execute(input Input)
 }
@@ -36,27 +63,29 @@ type Configure struct {
 }
 
 type MapCommand struct {
-	Command       CommandInterface
+	Command       Command
 	CommandConfig Configure
 }
 
 // 参数操作
 type Input struct {
+	console *Console
 	// 是否有参数 【名称string】默认值bool
 	Has map[string]bool
 	// 必须输入参数 【命令位置】【赋值名称】默认值
 	Argument map[string]string
 	// 可选输入参数 【赋值名称（开头必须是-）】默认值
-	Option map[string]string
+	Option map[string][]string
 	// 启动文件
 	FilePath string
 }
 
 // 参数存储
 type ArgParam struct {
-	Name        string // 名称
-	Description string // 说明
-	Default     string // 默认值
+	Name        string                            // 名称
+	Description string                            // 说明
+	Default     string                            // 默认值
+	Call        func(val string, c *Console) bool // 获取值的时候执行, return false中断
 }
 
 // 参数设置结构
@@ -75,35 +104,13 @@ func (c *Console) IniConfig() {
 	c.config.Load(path)
 }
 
-var BaseInputHas = map[string]ArgParam{
-	"-d": ArgParam{Name: "-d", Description: "守护进程启动"},
-	"-h": ArgParam{Name: "-h", Description: "显示帮助信息"},
-}
-
-// 记录 BaseInputHas 是否被覆盖，如果覆盖，就不执行默认流程
 var cacheInput = make(map[string]map[string]bool)
 
 // 载入命令
-func (c *Console) AddCommand(Command CommandInterface) {
+func (c *Console) AddCommand(Command Command) {
 	var SaveCom MapCommand
-	var CmdConfig Configure
 
-	CmdConfig = Command.Configure()
-	for _, ArgParam := range CmdConfig.Input.Has {
-		switch ArgParam.Name {
-		case "-d":
-			cacheInput[CmdConfig.Name]["-d"] = true
-		case "-h":
-			cacheInput[CmdConfig.Name]["-h"] = true
-		}
-	}
-	if _, ok := cacheInput[CmdConfig.Name]["-d"]; ok == false {
-		CmdConfig.Input.Has = append(CmdConfig.Input.Has, BaseInputHas["-d"])
-	}
-	if _, ok := cacheInput[CmdConfig.Name]["-d"]; ok == false {
-		CmdConfig.Input.Has = append(CmdConfig.Input.Has, BaseInputHas["-h"])
-	}
-
+	CmdConfig := Command.Configure()
 	for key, ArgParam := range CmdConfig.Input.Option {
 		if c.config.Has(ArgParam.Name) {
 			CmdConfig.Input.Option[key].Default = c.config.GetString(ArgParam.Name, "")
@@ -148,51 +155,27 @@ func (c *Console) Run() {
 	}
 
 	// 执行到这里，必须有命令
-	MapCmd := c.MapCommand[cmdName]
+	c.run = c.MapCommand[cmdName]
 	input := Input{
+		console:  c,
 		Has:      map[string]bool{},
 		Argument: map[string]string{},
-		Option:   map[string]string{},
+		Option:   map[string][]string{},
 		FilePath: os.Args[0],
 	}
-	err := input.Parsed(MapCmd.CommandConfig.Input, args)
+	err := input.Parsed(c.run.CommandConfig.Input, args)
 	if err != nil {
 		return
 	}
-	if _, ok := cacheInput[cmdName]["-h"]; ok == false {
-		// -h没有被覆盖时候,如果有帮助参数，只显示帮助信息
-		if input.GetHas("-h") {
-			Help{c}.HelpExecute(MapCmd.CommandConfig)
-			return
-		}
-	}
-	if _, ok := cacheInput[cmdName]["-d"]; ok == false {
-		// 如果有守护进程方式启动参数，拦截，并且转换后台启动
-		if input.GetHas("-d") {
-			for key, str := range os.Args {
-				if str == "-d" {
-					os.Args[key] = "-d=true"
-					break
-				}
-			}
-			command := exec.Command(os.Args[0], os.Args[1:]...)
-			out, err := os.OpenFile("/dev/null", os.O_RDWR, 0)
-			if err == nil {
-				command.Stdout = out
-			}
-			_ = command.Start()
-			return
-		} else if input.GetOption("d") == "true" {
-			// 命令转换为后台的传入
-			input.Has["-d"] = true
-		}
-	}
 
-	MapCmd.Command.Execute(input)
+	c.run.Command.Execute(input)
 }
 
 // 参数解析
 func (i *Input) Parsed(Config Argument, args []string) error {
+	// 选项值
+	i.ParsedOptions(Config, args)
+
 	for _, ArgParam := range Config.Has {
 		for _, strArg := range args {
 			if ArgParam.Name == strArg {
@@ -202,15 +185,6 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 		_, ok := i.Has[ArgParam.Name]
 		if !ok {
 			i.Has[ArgParam.Name] = false
-		}
-	}
-	// 帮助参数 -h 不需要配置
-	helpCmd := "-h"
-	i.Has[helpCmd] = false
-	for _, strArg := range args {
-		if helpCmd == strArg {
-			i.Has[helpCmd] = true
-			return nil
 		}
 	}
 
@@ -225,9 +199,16 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 			i.Argument[kv.Name] = args[mustInt]
 		}
 	}
-	// 选项值
+	return nil
+}
+
+// 解析选项值
+func (i *Input) ParsedOptions(Config Argument, args []string) {
+	for _, kv := range i.console.baseOption {
+		Config.Option = append(Config.Option, kv)
+	}
 	for _, kv := range Config.Option {
-		i.Option[kv.Name] = kv.Default
+		i.Option[kv.Name] = make([]string, 0)
 	}
 	var strArgKy, strValue string
 	for _, strArg := range args {
@@ -237,19 +218,30 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 			if stopIndex < 0 {
 				// 不存在 = 号
 				strArgKy = strArg[startIndex+1:]
-				defaultValue, _ := i.Option[strArgKy]
-				strValue = defaultValue
+				strValue = ""
 			} else {
 				strArgKy = strArg[startIndex+1 : stopIndex]
 				strValue = strArg[stopIndex+1:]
-
 			}
 			if strArgKy != "" {
-				i.Option[strArgKy] = strValue
+				if _, ok := i.Option[strArgKy]; !ok {
+					i.Option[strArgKy] = make([]string, 0)
+				}
+				i.Option[strArgKy] = append(i.Option[strArgKy], strValue)
 			}
 		}
 	}
-	return nil
+	for _, kv := range Config.Option {
+		if len(i.Option[kv.Name]) == 0 {
+			i.Option[kv.Name] = append(i.Option[kv.Name], kv.Default)
+		}
+		if kv.Call != nil {
+			stop := kv.Call(i.Option[kv.Name][0], i.console)
+			if stop == false {
+				os.Exit(0)
+			}
+		}
+	}
 }
 
 // 参数
@@ -275,6 +267,14 @@ func (i *Input) GetOption(key string) string {
 	value, ok := i.Option[key]
 	if !ok {
 		return ""
+	}
+	return value[0]
+}
+
+func (i *Input) GetOptions(key string) []string {
+	value, ok := i.Option[key]
+	if !ok {
+		return []string{}
 	}
 	return value
 }

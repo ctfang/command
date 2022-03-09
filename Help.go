@@ -21,9 +21,10 @@ func (Help) Configure() Configure {
 func (h Help) Execute(input Input) {
 	fmt.Println("Usage:")
 	fmt.Println("  command [options] [arguments] [has]")
-	fmt.Println("Base Has Param:")
-	fmt.Println("  -d  守护进程启动")
-	fmt.Println("  -h  显示帮助信息参数")
+	fmt.Println("Base Options:")
+	for _, param := range h.console.baseOption {
+		fmt.Printf("  %v  %v\n", param.Name, param.Description)
+	}
 	fmt.Println("Available commands:")
 	// 命令排序
 	var keys []string
