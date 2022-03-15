@@ -8,6 +8,14 @@ import (
 
 func main() {
 	app := command.New()
+
+	app.AddBaseOption(command.ArgParam{
+		Name:        "TEST",
+		Description: "fffffffffffffffffffffffff",
+		Default:     "false",
+		Call:        nil,
+	})
+
 	app.AddCommand(Echo{})
 	app.AddCommand(Hello{})
 	app.Run()

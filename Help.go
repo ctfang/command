@@ -22,8 +22,9 @@ func (h Help) Execute(input Input) {
 	fmt.Println("Usage:")
 	fmt.Println("  command [options] [arguments] [has]")
 	fmt.Println("Base Options:")
-	for _, param := range h.console.baseOption {
-		fmt.Printf("  -%v  %v\n", param.Name, param.Description)
+	for _, ArgParam := range h.console.baseOption {
+		h.EchoSpace("  -"+ArgParam.Name, 25)
+		fmt.Println(ArgParam.Description)
 	}
 	fmt.Println("Available commands:")
 	// 命令排序
@@ -72,6 +73,10 @@ func (h Help) HelpExecute(con Configure) {
 	}
 	fmt.Println("Option:")
 	for _, ArgParam := range con.Input.Option {
+		h.EchoSpace("  -"+ArgParam.Name, 25)
+		fmt.Println(ArgParam.Description)
+	}
+	for _, ArgParam := range h.console.baseOption {
 		h.EchoSpace("  -"+ArgParam.Name, 25)
 		fmt.Println(ArgParam.Description)
 	}
