@@ -45,7 +45,7 @@ func helpDaemon(val string, c *Console) bool {
 
 // 添加通用参数
 func (c *Console) AddBaseOption(param ArgParam) {
-	c.baseOption = append(c.baseOption, param)
+	c.baseOption = append([]ArgParam{param}, c.baseOption...)
 }
 
 type Command interface {
