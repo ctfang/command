@@ -231,10 +231,17 @@ func (i *Input) ParsedOptions(Config Argument, args []string) {
 			}
 		}
 	}
+	// 添加默认值
 	for _, kv := range Config.Option {
 		if len(i.Option[kv.Name]) == 0 {
-			i.Option[kv.Name] = append(i.Option[kv.Name], kv.Default)
+			// 支持多个默认值
+			for _, kv2 := range Config.Option {
+				if kv.Name == kv2.Name {
+					i.Option[kv.Name] = append(i.Option[kv.Name], kv.Default)
+				}
+			}
 		}
+		// 执行回调, 使用回调赋值
 		if kv.Call != nil {
 			var stop bool
 			i.Option[kv.Name][0], stop = kv.Call(i.Option[kv.Name][0], i.console)
