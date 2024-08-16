@@ -237,7 +237,7 @@ func (i *Input) ParsedOptions(Config Argument, args []string) {
 			// 支持多个默认值
 			for _, kv2 := range Config.Option {
 				if kv.Name == kv2.Name {
-					i.Option[kv.Name] = append(i.Option[kv.Name], kv.Default)
+					i.Option[kv.Name] = append(i.Option[kv.Name], kv2.Default)
 				}
 			}
 		}

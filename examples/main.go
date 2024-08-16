@@ -11,7 +11,7 @@ func main() {
 
 	app.AddBaseOption(command.ArgParam{
 		Name:        "TEST",
-		Description: "fffffffffffffffffffffffff",
+		Description: "显示帮助信息",
 		Default:     "false",
 		Call:        nil,
 	})
@@ -55,7 +55,8 @@ func (Hello) Configure() command.Configure {
 			},
 			// 可选的参数，不输入也能执行
 			Option: []command.ArgParam{
-				{Name: "age", Description: "年龄选项参数"},
+				{Name: "age", Description: "年龄选项参数", Default: "18"},
+				{Name: "age", Description: "年龄选项参数", Default: "24"},
 			},
 		},
 	}
