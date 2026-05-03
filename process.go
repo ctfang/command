@@ -3,7 +3,6 @@ package command
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -37,7 +36,7 @@ func GetRootFile() string {
 func SavePidToFile(key string) {
 	pid := os.Getpid()
 	path := GetRootFile() + "_" + key + ".lock"
-	_ = ioutil.WriteFile(path, []byte(fmt.Sprintf("%d", pid)), 0666)
+	_ = os.WriteFile(path, []byte(fmt.Sprintf("%d", pid)), 0666)
 }
 
 /*
@@ -55,11 +54,11 @@ func DeleteSavePidToFile(key string) {
 */
 func GetPidForFile(key string) int {
 	path := GetRootFile() + "_" + key + ".lock"
-	str, err := ioutil.ReadFile(path)
+	str, err := os.ReadFile(path)
 	if err != nil {
 		return 0
 	}
-	pid, err := strconv.Atoi(string(str))
+	pid, err := strconv.Atoi(strings.TrimSpace(string(str)))
 	if err != nil {
 		return 0
 	}
@@ -95,13 +94,13 @@ func StopSignal(key string) error {
 	err = pro.Signal(syscall.SIGINT)
 	if err != nil {
 		if runtime.GOOS == "windows" {
-			err = pro.Kill()
-			if err != nil {
-				return nil
+			if kerr := pro.Kill(); kerr != nil {
+				return kerr
 			}
 			DeleteSavePidToFile(key)
+			return nil
 		}
-		return nil
+		return err
 	}
 	return nil
 }

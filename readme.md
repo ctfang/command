@@ -22,9 +22,11 @@ func main() {
 	app := command.New()
 	app.AddCommand(Echo{})
 	app.AddCommand(Hello{})
-	app.Run()
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
-// Echo 需要实现接口 CommandInterface
+// Echo 需要实现 Command 接口
 type Echo struct {
 }
 
@@ -46,9 +48,10 @@ go run main.go
 -------------------------------------
 Usage:
   command [options] [arguments] [has]
+Base Options:
+  -h                       显示帮助信息
 Base Has Param:
-  -d  守护进程启动
-  -h  显示帮助信息参数
+  -d                       守护进程启动
 Available commands:
   echo  示例命令 echo
   help   帮助命令
@@ -150,9 +153,13 @@ if name == "" {
 app := command.New()
 
 app.SetConfig("config.ini")
-app.IniConfig()
+if err := app.IniConfig(); err != nil {
+	log.Fatal(err)
+}
 
-app.Run()
+if err := app.Run(); err != nil {
+	log.Fatal(err)
+}
 ~~~~
 config.ini 文件内容
 ~~~~

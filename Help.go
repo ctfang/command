@@ -26,6 +26,13 @@ func (h Help) Execute(input Input) {
 		h.EchoSpace("  -"+ArgParam.Name, 25)
 		fmt.Println(ArgParam.Description)
 	}
+	if len(h.console.baseHas) > 0 {
+		fmt.Println("Base Has Param:")
+		for _, ArgParam := range h.console.baseHas {
+			h.EchoSpace("  "+ArgParam.Name, 25)
+			fmt.Println(ArgParam.Description)
+		}
+	}
 	fmt.Println("Available commands:")
 	// 命令排序
 	var keys []string
@@ -81,6 +88,10 @@ func (h Help) HelpExecute(con Configure) {
 		fmt.Println(ArgParam.Description)
 	}
 	fmt.Println("Has:")
+	for _, ArgParam := range h.console.baseHas {
+		h.EchoSpace("  "+ArgParam.Name, 25)
+		fmt.Println(ArgParam.Description)
+	}
 	for _, ArgParam := range con.Input.Has {
 		h.EchoSpace("  "+ArgParam.Name, 25)
 		fmt.Println(ArgParam.Description)

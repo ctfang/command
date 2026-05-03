@@ -18,7 +18,9 @@ func main() {
 
 	app.AddCommand(Echo{})
 	app.AddCommand(Hello{})
-	app.Run()
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 type Echo struct {

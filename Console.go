@@ -12,6 +12,7 @@ type Console struct {
 	configPath string
 	config     ini
 	baseOption []ArgParam
+	baseHas    []ArgParam
 	run        MapCommand
 }
 
@@ -27,6 +28,9 @@ func New() Console {
 				Call:        helpHandle,
 			},
 		},
+		baseHas: []ArgParam{
+			{Name: "-d", Description: "守护进程启动"},
+		},
 	}
 }
 
@@ -39,13 +43,14 @@ func helpHandle(val string, c *Console) (string, bool) {
 	return val, true
 }
 
-func helpDaemon(val string, c *Console) bool {
-	return false
-}
-
 // 添加通用参数
 func (c *Console) AddBaseOption(param ArgParam) {
 	c.baseOption = append([]ArgParam{param}, c.baseOption...)
+}
+
+// 添加通用 Has 匹配参数（与命令行 token 完全相等即视为命中）
+func (c *Console) AddBaseHas(param ArgParam) {
+	c.baseHas = append([]ArgParam{param}, c.baseHas...)
 }
 
 type Command interface {
@@ -98,13 +103,11 @@ type Argument struct {
 	Option []ArgParam
 }
 
-func (c *Console) IniConfig() {
+func (c *Console) IniConfig() error {
 	path := c.getConfig()
 	c.config = ini{}
-	c.config.Load(path)
+	return c.config.Load(path)
 }
-
-var cacheInput = make(map[string]map[string]bool)
 
 // 载入命令
 func (c *Console) AddCommand(Command Command) {
@@ -131,7 +134,7 @@ func (c *Console) SetConfig(path string) {
 }
 
 // 载入命令
-func (c *Console) Run() {
+func (c *Console) Run() error {
 	defaultCmdName := "help"
 	_, ok := c.MapCommand[defaultCmdName]
 	if !ok {
@@ -165,10 +168,33 @@ func (c *Console) Run() {
 	}
 	err := input.Parsed(c.run.CommandConfig.Input, args)
 	if err != nil {
-		return
+		return err
 	}
 
 	c.run.Command.Execute(input)
+	return nil
+}
+
+// filterPositionalArgs 与 ParsedOptions 一致：`-x` / `-x=y` 视为选项；
+// 其余 token 归入位置参数，使其可与选项任意混排。
+func filterPositionalArgs(args []string) []string {
+	pos := make([]string, 0, len(args))
+	for _, strArg := range args {
+		if strings.HasPrefix(strArg, "-") {
+			continue
+		}
+		pos = append(pos, strArg)
+	}
+	return pos
+}
+
+// argTokenSet 用于 Has 匹配：O(|args|) 建表，避免对每个 Has 定义扫整段 argv。
+func argTokenSet(args []string) map[string]struct{} {
+	m := make(map[string]struct{}, len(args))
+	for _, t := range args {
+		m[t] = struct{}{}
+	}
+	return m
 }
 
 // 参数解析
@@ -176,27 +202,26 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 	// 选项值
 	i.ParsedOptions(Config, args)
 
-	for _, ArgParam := range Config.Has {
-		for _, strArg := range args {
-			if ArgParam.Name == strArg {
-				i.Has[ArgParam.Name] = true
-			}
-		}
-		_, ok := i.Has[ArgParam.Name]
-		if !ok {
+	hasDefs := append(append([]ArgParam{}, i.console.baseHas...), Config.Has...)
+	tokens := argTokenSet(args)
+	for _, ArgParam := range hasDefs {
+		if _, ok := tokens[ArgParam.Name]; ok {
+			i.Has[ArgParam.Name] = true
+		} else {
 			i.Has[ArgParam.Name] = false
 		}
 	}
 
-	// 必须值
-	lenArgument := len(args)
+	// 必须位置参数：仅从非 "-" 前缀 token 中取，避免 `-o=x` 占据 argv 槽位
+	positional := filterPositionalArgs(args)
+	lenArgument := len(positional)
 	for mustInt, kv := range Config.Argument {
 		if lenArgument <= mustInt {
 			// 不存在，报错,并且输出帮助命令
 			fmt.Println("必须输入参数:" + kv.Name)
 			return errors.New("必须输入参数:" + kv.Name)
 		} else {
-			i.Argument[kv.Name] = args[mustInt]
+			i.Argument[kv.Name] = positional[mustInt]
 		}
 	}
 	return nil
@@ -206,6 +231,10 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 func (i *Input) ParsedOptions(Config Argument, args []string) {
 	for _, kv := range i.console.baseOption {
 		Config.Option = append(Config.Option, kv)
+	}
+	defaultsByName := make(map[string][]string)
+	for _, kv := range Config.Option {
+		defaultsByName[kv.Name] = append(defaultsByName[kv.Name], kv.Default)
 	}
 	for _, kv := range Config.Option {
 		i.Option[kv.Name] = make([]string, 0)
@@ -231,15 +260,10 @@ func (i *Input) ParsedOptions(Config Argument, args []string) {
 			}
 		}
 	}
-	// 添加默认值
+	// 添加默认值（按名称合并各 ArgParam 的 Default，与原先 O(n²) 双层循环等价）
 	for _, kv := range Config.Option {
 		if len(i.Option[kv.Name]) == 0 {
-			// 支持多个默认值
-			for _, kv2 := range Config.Option {
-				if kv.Name == kv2.Name {
-					i.Option[kv.Name] = append(i.Option[kv.Name], kv2.Default)
-				}
-			}
+			i.Option[kv.Name] = append(i.Option[kv.Name], defaultsByName[kv.Name]...)
 		}
 		// 执行回调, 使用回调赋值
 		if kv.Call != nil {

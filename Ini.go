@@ -13,18 +13,21 @@ type ini struct {
 	config map[string]interface{}
 }
 
-func (i *ini) GetFileName(path string)string {
+func (i *ini) GetFileName(path string) string {
 	return filepath.Join(path)
 }
 
-func (i *ini) Load(path string) {
+func (i *ini) Load(path string) error {
 	i.config = make(map[string]interface{})
 
 	path = i.GetFileName(path)
 
 	file, err := os.Open(path)
-	if err != nil && os.IsNotExist(err) {
-		return
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
 	}
 	defer file.Close()
 
@@ -37,7 +40,7 @@ func (i *ini) Load(path string) {
 			if err == io.EOF {
 				break
 			}
-			panic(err)
+			return err
 		}
 
 		//去除单行属性两端的空格
@@ -56,7 +59,7 @@ func (i *ini) Load(path string) {
 			if index < 0 {
 				continue
 			}
-			prefix = string(b[1:index]) + "."
+			prefix = strings.TrimSpace(s[1:index]) + "."
 		} else {
 			key, value := i.getKeyValue(s)
 			if key != "" {
@@ -65,6 +68,7 @@ func (i *ini) Load(path string) {
 		}
 
 	}
+	return nil
 }
 
 func (i *ini) getKeyValue(s string) (string, interface{}) {
@@ -86,18 +90,24 @@ func (i *ini) getKeyValue(s string) (string, interface{}) {
 	}
 
 	// 值转换
-	if value=="true" {
-		return key,true
-	}else if value=="false" {
-		return key,false
-	}else if value[0:1]=="\"" {
-		return key,value[1:len(value)-1]
-	}else if strings.Index(value, ".")>0 {
-		float,_ := strconv.ParseFloat(value, 32)
-		return key,float
-	}else{
-		num,_ := strconv.Atoi(value)
-		return key,num
+	if value == "true" {
+		return key, true
+	} else if value == "false" {
+		return key, false
+	} else if len(value) >= 2 && value[0:1] == "\"" {
+		return key, value[1 : len(value)-1]
+	} else if strings.Contains(value, ".") {
+		f, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return key, value
+		}
+		return key, f
+	} else {
+		num, err := strconv.Atoi(value)
+		if err != nil {
+			return key, value
+		}
+		return key, num
 	}
 }
 
@@ -126,7 +136,6 @@ func (i *ini) GetString(key string, value string) string {
 	}
 	return value
 }
-
 
 // 获取值
 func (i *ini) GetBool(key string, value bool) bool {
