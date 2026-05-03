@@ -2,22 +2,40 @@ package main
 
 import (
 	"fmt"
-	"github.com/ctfang/command"
 	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/ctfang/command"
 )
+
+// resolveConfigExample 在「仓库根」或「examples 目录」下执行 go run 时都能找到 ini。
+func resolveConfigExample() string {
+	for _, p := range []string{"config.example.ini", filepath.Join("examples", "config.example.ini")} {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "config.example.ini"
+}
 
 func main() {
 	app := command.New()
 
 	app.AddBaseOption(command.ArgParam{
-		Name:        "TEST",
-		Description: "显示帮助信息",
+		Name:        "verbose",
+		Description: "示例：全局可选开关",
 		Default:     "false",
 		Call:        nil,
 	})
+	app.SetConfig(resolveConfigExample())
+	if err := app.IniConfig(); err != nil {
+		log.Fatal(err)
+	}
 
 	app.AddCommand(Echo{})
 	app.AddCommand(Hello{})
+	app.AddCommand(ConfigDemo{})
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
@@ -34,7 +52,7 @@ func (Echo) Configure() command.Configure {
 }
 
 func (Echo) Execute(input command.Input) {
-	log.Println("hello command")
+	log.Println("echo command")
 }
 
 type Hello struct {
@@ -69,6 +87,31 @@ func (Hello) Execute(input command.Input) {
 	fmt.Println("名称：", input.GetArgument("name"))
 	fmt.Println("性别：", input.GetArgument("sex"))
 	fmt.Println("年龄 ：", input.GetOption("age"))
+	fmt.Println("verbose(全局)：", input.GetOption("verbose"))
 	fmt.Println("是否输入了 one ：", input.GetHas("one"))
 	fmt.Println("是否输入了 -t ：", input.GetHas("-t"))
+	fmt.Println("守护进程：", input.IsDaemon())
+}
+
+// ConfigDemo 演示 INI 默认值与命令行覆盖（需存在 config.example.ini）
+type ConfigDemo struct{}
+
+func (ConfigDemo) Configure() command.Configure {
+	return command.Configure{
+		Name:        "configdemo",
+		Description: "读取 INI 中 url/port；命令行 -url= / -port= 覆盖",
+		Input: command.Argument{
+			Option: []command.ArgParam{
+				{Name: "url", Description: "服务 URL", Default: "http://127.0.0.1:8080"},
+				{Name: "port", Description: "端口", Default: "9000"},
+			},
+		},
+	}
+}
+
+func (ConfigDemo) Execute(input command.Input) {
+	fmt.Println("url ：", input.GetOption("url"))
+	fmt.Println("port：", input.GetOption("port"))
+	fmt.Println("verbose(全局)：", input.GetOption("verbose"))
+	fmt.Println("程序路径：", input.GetFilePath())
 }

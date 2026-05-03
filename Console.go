@@ -30,6 +30,7 @@ func New() Console {
 		},
 		baseHas: []ArgParam{
 			{Name: "-d", Description: "守护进程启动"},
+			{Name: "--d", Description: "守护进程启动（等价 -d）"},
 		},
 	}
 }
@@ -79,7 +80,7 @@ type Input struct {
 	Has map[string]bool
 	// 必须输入参数 【命令位置】【赋值名称】默认值
 	Argument map[string]string
-	// 可选输入参数 【赋值名称（开头必须是-）】默认值
+	// 可选输入参数 【Configure 里 Name 不含 -；命令行 -name / -name=v，另兼容 --name=v，不改变原「位置参数」切分规则】默认值
 	Option map[string][]string
 	// 启动文件
 	FilePath string
@@ -99,7 +100,7 @@ type Argument struct {
 	Has []ArgParam
 	// 必须输入参数 【命令位置】【赋值名称】默认值
 	Argument []ArgParam
-	// 可选输入参数 【赋值名称（开头必须是-）】默认值
+	// 可选输入参数 【Name 为 flag 名不含前导 -；命令行 -Name、-Name=v；兼容 --Name=v；见 readme】默认值
 	Option []ArgParam
 }
 
@@ -175,16 +176,64 @@ func (c *Console) Run() error {
 	return nil
 }
 
-// filterPositionalArgs 与 ParsedOptions 一致：`-x` / `-x=y` 视为选项；
-// 其余 token 归入位置参数，使其可与选项任意混排。
+// splitArgsAtDoubleDash 在首个 "--" 处切开；与 POSIX/flag 一致，其后 argv 全部视为位置参数（含以 - 开头的 token）。
+func splitArgsAtDoubleDash(args []string) (before, after []string) {
+	for i, a := range args {
+		if a == "--" {
+			return append([]string(nil), args[:i]...), append([]string(nil), args[i+1:]...)
+		}
+	}
+	return args, nil
+}
+
+// parseFlagNameValue 仅从**单个** argv token 解析：-a / --a / -a=b / --a=b → 选项名 key（无横线）、值。
+// 不消费下一个 token，保持本库原有位置参数规则。
+func parseFlagNameValue(arg string) (name, value string, ok bool) {
+	rest := arg
+	switch {
+	case strings.HasPrefix(rest, "--"):
+		rest = rest[2:]
+	case strings.HasPrefix(rest, "-"):
+		rest = rest[1:]
+	default:
+		return "", "", false
+	}
+	if rest == "" {
+		return "", "", false
+	}
+	if idx := strings.Index(rest, "="); idx >= 0 {
+		return rest[:idx], rest[idx+1:], true
+	}
+	return rest, "", true
+}
+
+// optionsFromArgs 仅扫 before 段中带 - 的 token；每个 token 独立解析，与历史行为一致（-age 与 18 分两 token 时 18 仍是位置参数）。
+func optionsFromArgs(before []string) map[string][]string {
+	opts := make(map[string][]string)
+	for _, strArg := range before {
+		if !strings.HasPrefix(strArg, "-") {
+			continue
+		}
+		name, value, ok := parseFlagNameValue(strArg)
+		if !ok || name == "" {
+			continue
+		}
+		opts[name] = append(opts[name], value)
+	}
+	return opts
+}
+
+// filterPositionalArgs：沿用原规则——before 段中非 "-" 开头的 token 为位置参数；"--" 之后整段追加为位置参数（兼容常见 CLI 终止符）。
 func filterPositionalArgs(args []string) []string {
+	before, after := splitArgsAtDoubleDash(args)
 	pos := make([]string, 0, len(args))
-	for _, strArg := range args {
+	for _, strArg := range before {
 		if strings.HasPrefix(strArg, "-") {
 			continue
 		}
 		pos = append(pos, strArg)
 	}
+	pos = append(pos, after...)
 	return pos
 }
 
@@ -199,7 +248,6 @@ func argTokenSet(args []string) map[string]struct{} {
 
 // 参数解析
 func (i *Input) Parsed(Config Argument, args []string) error {
-	// 选项值
 	i.ParsedOptions(Config, args)
 
 	hasDefs := append(append([]ArgParam{}, i.console.baseHas...), Config.Has...)
@@ -212,7 +260,7 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 		}
 	}
 
-	// 必须位置参数：仅从非 "-" 前缀 token 中取，避免 `-o=x` 占据 argv 槽位
+	// 必须位置参数：原规则 + 首个 "--" 之后全部计入位置参数
 	positional := filterPositionalArgs(args)
 	lenArgument := len(positional)
 	for mustInt, kv := range Config.Argument {
@@ -227,8 +275,10 @@ func (i *Input) Parsed(Config Argument, args []string) error {
 	return nil
 }
 
-// 解析选项值
+// 解析选项值（只解析首个 "--" 之前的 flag token；每个 token 自成一项，不把下一 token 当作值）
 func (i *Input) ParsedOptions(Config Argument, args []string) {
+	before, _ := splitArgsAtDoubleDash(args)
+	optVals := optionsFromArgs(before)
 	for _, kv := range i.console.baseOption {
 		Config.Option = append(Config.Option, kv)
 	}
@@ -239,26 +289,8 @@ func (i *Input) ParsedOptions(Config Argument, args []string) {
 	for _, kv := range Config.Option {
 		i.Option[kv.Name] = make([]string, 0)
 	}
-	var strArgKy, strValue string
-	for _, strArg := range args {
-		startIndex := strings.Index(strArg, "-")
-		if startIndex == 0 {
-			stopIndex := strings.Index(strArg, "=")
-			if stopIndex < 0 {
-				// 不存在 = 号
-				strArgKy = strArg[startIndex+1:]
-				strValue = ""
-			} else {
-				strArgKy = strArg[startIndex+1 : stopIndex]
-				strValue = strArg[stopIndex+1:]
-			}
-			if strArgKy != "" {
-				if _, ok := i.Option[strArgKy]; !ok {
-					i.Option[strArgKy] = make([]string, 0)
-				}
-				i.Option[strArgKy] = append(i.Option[strArgKy], strValue)
-			}
-		}
+	for name, vals := range optVals {
+		i.Option[name] = append(i.Option[name], vals...)
 	}
 	// 添加默认值（按名称合并各 ArgParam 的 Default，与原先 O(n²) 双层循环等价）
 	for _, kv := range Config.Option {
@@ -311,13 +343,9 @@ func (i *Input) GetOptions(key string) []string {
 	return value
 }
 
-// 是否后台启动
+// 是否后台启动（兼容 -d 与 --d，与 flag 单双横线习惯一致）
 func (i *Input) IsDaemon() bool {
-	value, ok := i.Has["-d"]
-	if !ok {
-		return false
-	}
-	return value
+	return i.GetHas("-d") || i.GetHas("--d")
 }
 
 func (i *Input) GetFilePath() string {
